@@ -1,12 +1,6 @@
 # yz-chat
 
-A chat app built with React Native and Firebase. The app allows users to send messages real-time and supports message pagination.
-
-## Prerequisites
-
--  Node.js
--  Expo CLI
--  iOS Simulator or physical device
+A chat app built with React Native (Expo Go) and Firebase. The app allows users to send messages real-time and supports message pagination.
 
 *Please note: This app has only been tested on iOS. It has not been tested on web or Android.*
 
