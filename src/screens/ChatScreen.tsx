@@ -37,18 +37,19 @@ interface Message {
 const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
   const { userName } = route.params
   const [messages, setMessages] = useState<Message[]>([])
+  const [oldMessages, setOldMessages] = useState<Message[]>([])
   const [message, setMessage] = useState("")
   const [lastDoc, setLastDoc] =
     useState<QueryDocumentSnapshot<DocumentData> | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  const messagesQuery = query(
-    collection(db, "messages"),
-    orderBy("createdAt", "asc"),
-    limit(25)
-  )
+  const [loadingMessages, setLoadingMessages] = useState(false)
 
   useEffect(() => {
+    const messagesQuery = query(
+      collection(db, "kvzivn-messages"),
+      orderBy("createdAt", "desc"),
+      limit(25)
+    )
+
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
       let msgs: Message[] = []
       snapshot.forEach((doc) => {
@@ -56,22 +57,22 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
         msgs.push({ ...data })
       })
       setLastDoc(snapshot.docs[snapshot.docs.length - 1])
-      setMessages(msgs.reverse())
+      setMessages(msgs)
     })
 
-    return () => unsubscribe()
+    return unsubscribe
   }, [])
 
   const loadMoreMessages = async () => {
-    if (loading || !lastDoc) return
+    if (loadingMessages || !lastDoc) return
 
-    setLoading(true)
+    setLoadingMessages(true)
 
     const moreMessagesQuery = query(
-      collection(db, "messages"),
-      orderBy("createdAt", "asc"),
+      collection(db, "kvzivn-messages"),
+      orderBy("createdAt", "desc"),
       startAfter(lastDoc),
-      limit(10)
+      limit(5)
     )
 
     const snapshot = await getDocs(moreMessagesQuery)
@@ -82,18 +83,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
         const data = doc.data() as Message
         moreMessages.push({ ...data })
       })
+
+      setOldMessages((prevMessages) => [...moreMessages, ...prevMessages])
       setLastDoc(snapshot.docs[snapshot.docs.length - 1])
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        ...moreMessages.reverse(),
-      ])
     }
-    setLoading(false)
+    setLoadingMessages(false)
   }
 
   const onSendPress = async () => {
     if (message.length > 0) {
-      await addDoc(collection(db, "messages"), {
+      await addDoc(collection(db, "kvzivn-messages"), {
         id: userName,
         text: message,
         createdAt: serverTimestamp(),
@@ -115,8 +114,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {loadingMessages && (
+        <Text style={styles.loadingText}>Loading more messages...</Text>
+      )}
       <FlatList
-        data={messages}
+        data={[...messages, ...oldMessages]}
         renderItem={renderItem}
         onEndReached={loadMoreMessages}
         onEndReachedThreshold={0.1}
@@ -162,6 +164,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "white",
   },
+  loadingText: {
+    textAlign: "center",
+    paddingVertical: 30,
+  },
   chatContainer: {
     paddingHorizontal: 20,
     marginBottom: 10,
@@ -185,7 +191,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     height: 80,
     flexDirection: "row",
-    paddingHorizontal: 32,
+    paddingHorizontal: 16,
     paddingBottom: 12,
     justifyContent: "space-between",
     alignItems: "center",

@@ -3,7 +3,6 @@ import { View, Text, TextInput, Pressable } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import { DisplayNameScreenNavigationProp } from "../types"
 import { StyleSheet } from "react-native"
-import { theme } from "../styles/theme"
 
 const DisplayNameScreen: React.FC = () => {
   const navigation = useNavigation<DisplayNameScreenNavigationProp>()
