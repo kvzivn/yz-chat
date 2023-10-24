@@ -20,6 +20,10 @@ import {
   Timestamp,
   serverTimestamp,
   onSnapshot,
+  QueryDocumentSnapshot,
+  DocumentData,
+  startAfter,
+  getDocs,
 } from "firebase/firestore"
 import { ChatScreenProps } from "../types"
 import { theme } from "../styles/theme"
@@ -34,29 +38,62 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
   const { userName } = route.params
   const [messages, setMessages] = useState<Message[]>([])
   const [message, setMessage] = useState("")
+  const [lastDoc, setLastDoc] =
+    useState<QueryDocumentSnapshot<DocumentData> | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const messagesQuery = query(
-    collection(db, "yz-messages"),
+    collection(db, "messages"),
     orderBy("createdAt", "asc"),
     limit(25)
   )
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(query(messagesQuery), (snapshot) => {
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
       let msgs: Message[] = []
       snapshot.forEach((doc) => {
         const data = doc.data() as Message
         msgs.push({ ...data })
       })
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1])
       setMessages(msgs.reverse())
     })
 
     return () => unsubscribe()
   }, [])
 
+  const loadMoreMessages = async () => {
+    if (loading || !lastDoc) return
+
+    setLoading(true)
+
+    const moreMessagesQuery = query(
+      collection(db, "messages"),
+      orderBy("createdAt", "asc"),
+      startAfter(lastDoc),
+      limit(10)
+    )
+
+    const snapshot = await getDocs(moreMessagesQuery)
+
+    if (!snapshot.empty) {
+      let moreMessages: Message[] = []
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data() as Message
+        moreMessages.push({ ...data })
+      })
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1])
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        ...moreMessages.reverse(),
+      ])
+    }
+    setLoading(false)
+  }
+
   const onSendPress = async () => {
     if (message.length > 0) {
-      await addDoc(collection(db, "yz-messages"), {
+      await addDoc(collection(db, "messages"), {
         id: userName,
         text: message,
         createdAt: serverTimestamp(),
@@ -81,6 +118,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
       <FlatList
         data={messages}
         renderItem={renderItem}
+        onEndReached={loadMoreMessages}
+        onEndReachedThreshold={0.1}
         keyExtractor={(item, index) => index.toString()}
         style={styles.chatContainer}
         inverted
